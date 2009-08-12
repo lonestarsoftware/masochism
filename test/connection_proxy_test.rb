@@ -128,6 +128,19 @@ class DelegatingTest < MasochismTestCase
     @master.expects(:insert).with('INSERT').returns(1)
     assert_equal 1, connection.insert('INSERT')
   end
+
+  class User < ActiveRecord::Base
+  end
+  def test_reads_w_lock_go_to_master
+    @master.expects(:quote_table_name).with('users').returns('users')
+    @master.expects(:add_limit_offset!).with('SELECT * FROM users ', {:lock => "LOCK IN SHARE MODE"}).returns("SELECT * FROM users LOCK IN SHARE MODE")
+    @master.expects(:add_lock!).with('SELECT * FROM users ', {:lock => "LOCK IN SHARE MODE"}) do |sql, options|
+      sql << "LOCK IN SHARE MODE"
+    end
+    @master.expects(:select_all).with('SELECT * FROM users LOCK IN SHARE MODE', 'DelegatingTest::User Load').returns([])
+    assert_equal [], User.find(:all, :lock => "LOCK IN SHARE MODE")
+  end
+
   
   def test_execute_gos_to_master
     @master.expects(:execute).with('QUERY').returns('result')
