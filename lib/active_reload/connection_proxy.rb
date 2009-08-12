@@ -133,10 +133,22 @@ module ActiveReload
     end
   end
 
+  class ActiveRecord::Base
+    class << self
+      def find_every_with_master(options)
+        if options.has_key?(:lock)
+          connection.with_master { find_every_without_master(options) }
+        else
+          find_every_without_master(options)
+        end
+      end
+      alias_method_chain :find_every, :master
+    end
+  end
+
   module ActiveRecordConnectionMethods
     def self.included(base)
       base.alias_method_chain :reload, :master
-      base.alias_method_chain :find_every, :master
 
       class << base
         def connection_proxy=(proxy)
@@ -147,14 +159,6 @@ module ActiveReload
         def connection
           @@connection_proxy
         end
-      end
-    end
-    
-    def find_every_with_master(options)
-      if options.has_key?(:lock)
-        connection.with_master { find_every_without_master(options) }
-      else
-        find_every_without_master(options)
       end
     end
     
